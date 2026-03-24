@@ -38,14 +38,14 @@ release [flags]
 
 ### Flags
 
-| Flag | Description |
-|------|-------------|
-| `-tag <tag>` | Manual tag to create (skips version detection and bump menu) |
-| `-message <msg>` | Tag/release message (default: `Release <tag>`) |
-| `-push` | Automatically push tag to all remotes |
-| `-release` | Automatically create release on all detected forges |
-| `-dry-run` | Preview the execution plan without making changes |
-| `-force` | Proceed despite dirty working tree or existing tag |
+| Flag             | Description                                                  |
+| ---------------- | ------------------------------------------------------------ |
+| `-tag <tag>`     | Manual tag to create (skips version detection and bump menu) |
+| `-message <msg>` | Tag/release message (default: `Release <tag>`)               |
+| `-push`          | Automatically push tag to all remotes                        |
+| `-release`       | Automatically create release on all detected forges          |
+| `-dry-run`       | Preview the execution plan without making changes            |
+| `-force`         | Proceed despite dirty working tree or existing tag           |
 
 ### Examples
 
