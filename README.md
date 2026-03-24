@@ -9,7 +9,7 @@ An interactive git tag & release manager for the terminal. Built with [Bubble Te
 - **Build Number** — supports `X.Y-N` patterns
 - **Multi-remote** — push tags to multiple remotes at once
 - **Forge releases** — create releases on GitHub (`gh`), GitLab (`glab`), and Gitea (`tea`)
-- **Flutter support** — automatically detects `pubspec.yaml` and offers to update the version field
+- **Package manager support** — automatically detects project type and offers to sync the version field (Flutter `pubspec.yaml` built-in; extensible for Go, Node.js/Yarn/pnpm, and more)
 - **Dry-run mode** — preview the execution plan without making changes
 
 ## Installation
@@ -61,6 +61,29 @@ release -force                 # Proceed despite dirty working tree
 
 - Git
 - Optional forge CLIs for creating releases: [`gh`](https://cli.github.com/), [`glab`](https://gitlab.com/gitlab-org/cli), or [`tea`](https://gitea.com/gitea/tea)
+
+## Adding a package manager
+
+Package manager support lives in the `pkgmanager/` sub-package. Each implementation satisfies the `pkgmanager.Manager` interface:
+
+```go
+type Manager interface {
+    Name() string
+    Detect(rootPath string) (*ProjectInfo, error)
+    TargetVersionForTag(tag string) string
+    ShouldPromptUpdate(info *ProjectInfo, target string) bool
+    NeedsUpdate(info *ProjectInfo, target string) bool
+    UpdateVersion(filePath, newVersion string) error
+}
+```
+
+To add support for a new ecosystem (e.g., Node.js / `package.json`):
+
+1. Create `pkgmanager/nodejs.go` implementing the interface above.
+2. Add an `init()` function that calls `Register(&NodeJSManager{})`.
+3. The TUI will automatically detect the project and offer to sync the version on the next release.
+
+Built-in implementations: **Flutter** (`pubspec.yaml`).
 
 ## License
 

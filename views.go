@@ -38,8 +38,8 @@ func (m model) View() string {
 		return m.viewPreReleaseConfirm()
 	case stepTagReview:
 		return m.viewTagReview()
-	case stepFlutterPubspecConfirm:
-		return m.viewFlutterPubspecConfirm()
+	case stepPackageVersionConfirm:
+		return m.viewPackageVersionConfirm()
 	case stepRemotes:
 		return m.viewRemotes()
 	case stepForgeRelease:
@@ -442,14 +442,15 @@ func (m model) viewTagReview() string {
 	tagBox := subtitleStyle.Render("Tag Review") + "\n\n"
 	tagBox += renderInfoLine("New tag", newTagDisplay) + "\n"
 	tagBox += renderInfoLine("Tag message", dimStyle.Render(m.tagMessage)) + "\n"
-	if m.flutter.Detected && m.flutter.HasVersion {
-		tagBox += renderInfoLine("Flutter pubspec", dimStyle.Render(m.flutter.Version)) + "\n"
-		target := flutterTargetVersionForTag(m.newTag)
+	if m.pkgInfo != nil && m.pkgInfo.Detected && m.pkgInfo.HasVersion {
+		label := m.pkgInfo.Manager.Name() + " version"
+		tagBox += renderInfoLine(label, dimStyle.Render(m.pkgInfo.Version)) + "\n"
+		target := m.pkgInfo.Manager.TargetVersionForTag(m.newTag)
 		if target != "" {
-			if target == m.flutter.Version {
-				tagBox += renderInfoLine("Pubspec target", successStyle.Render(target)+dimStyle.Render(" (already matches)")) + "\n"
+			if target == m.pkgInfo.Version {
+				tagBox += renderInfoLine("Package target", successStyle.Render(target)+dimStyle.Render(" (already matches)")) + "\n"
 			} else {
-				tagBox += renderInfoLine("Pubspec target", infoStyle.Render(target)) + "\n"
+				tagBox += renderInfoLine("Package target", infoStyle.Render(target)) + "\n"
 			}
 		}
 	}
@@ -483,7 +484,7 @@ func (m model) viewTagReview() string {
 	return b.String()
 }
 
-func (m model) viewFlutterPubspecConfirm() string {
+func (m model) viewPackageVersionConfirm() string {
 	var b strings.Builder
 
 	b.WriteString(m.viewHeader())
@@ -491,21 +492,26 @@ func (m model) viewFlutterPubspecConfirm() string {
 	b.WriteString(m.viewRepoInfo())
 	b.WriteString("\n")
 
-	needsUpdate := needsFlutterVersionUpdate(m.flutter, m.flutterTarget)
+	managerName := ""
+	if m.pkgInfo != nil && m.pkgInfo.Manager != nil {
+		managerName = m.pkgInfo.Manager.Name()
+	}
+
+	needsUpdate := m.pkgInfo != nil && m.pkgInfo.Manager.NeedsUpdate(m.pkgInfo, m.pkgVersionTarget)
 	if needsUpdate {
-		b.WriteString(subtitleStyle.Render("Update Flutter pubspec version?"))
+		b.WriteString(subtitleStyle.Render("Update " + managerName + " package version?"))
 		b.WriteString("\n")
-		b.WriteString(dimStyle.Render("A Flutter project was detected and the pubspec version does not match the release tag."))
+		b.WriteString(dimStyle.Render("A " + managerName + " project was detected and the version does not match the release tag."))
 	} else {
-		b.WriteString(subtitleStyle.Render("Flutter pubspec check"))
+		b.WriteString(subtitleStyle.Render(managerName + " version check"))
 		b.WriteString("\n")
-		b.WriteString(dimStyle.Render("A Flutter project was detected and the pubspec version already matches the release tag."))
+		b.WriteString(dimStyle.Render("A " + managerName + " project was detected and the version already matches the release tag."))
 	}
 	b.WriteString("\n\n")
 	b.WriteString(boxStyle.Render(
-		renderInfoLine("File", m.flutter.PubspecPath) + "\n" +
-			renderInfoLine("Current version", dimStyle.Render(m.flutter.Version)) + "\n" +
-			renderInfoLine("Target version", successStyle.Render(m.flutterTarget)),
+		renderInfoLine("File", m.pkgInfo.FilePath) + "\n" +
+			renderInfoLine("Current version", dimStyle.Render(m.pkgInfo.Version)) + "\n" +
+			renderInfoLine("Target version", successStyle.Render(m.pkgVersionTarget)),
 	))
 	b.WriteString("\n\n")
 
@@ -686,8 +692,9 @@ func (m model) viewSummary() string {
 
 	summary.WriteString(renderInfoLine("New tag", successStyle.Render(m.newTag)) + "\n")
 	summary.WriteString(renderInfoLine("Tag message", dimStyle.Render(m.tagMessage)) + "\n")
-	if update := m.flutterUpdate(); update != nil {
-		summary.WriteString(renderInfoLine("Flutter pubspec", dimStyle.Render(update.CurrentVersion+" -> ")+successStyle.Render(update.NewVersion)) + "\n")
+	if update := m.pkgVersionUpdate(); update != nil {
+		label := update.Manager.Name() + " version"
+		summary.WriteString(renderInfoLine(label, dimStyle.Render(update.CurrentVersion+" -> ")+successStyle.Render(update.NewVersion)) + "\n")
 	}
 
 	if m.flags.DryRun {
@@ -784,7 +791,7 @@ func (m model) viewDone() string {
 		b.WriteString("\n\n")
 		b.WriteString(boldStyle.Render("[r]") + dimStyle.Render(" Retry failed steps") + "  ")
 		undoLabel := " Undo (delete local tag and exit)"
-		if m.plan.FlutterUpdate != nil {
+		if m.plan.PackageUpdate != nil {
 			undoLabel = " Undo (delete local tag only; keep commit and any pushed branch changes)"
 		}
 		b.WriteString(boldStyle.Render("[u]") + dimStyle.Render(undoLabel) + "  ")

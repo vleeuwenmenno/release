@@ -9,6 +9,7 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"release/pkgmanager"
 )
 
 // step represents the current screen in the TUI flow
@@ -29,7 +30,7 @@ const (
 	stepCustomTag                         // Enter custom tag manually
 	stepPreReleaseConfirm                 // Always confirm whether this tag is a pre-release
 	stepTagReview                         // Review proposed tag, option to edit
-	stepFlutterPubspecConfirm             // Optionally update Flutter pubspec version before release
+	stepPackageVersionConfirm             // Optionally update a detected package manager version before release
 	stepRemotes                           // Pick which remote(s) to push to
 	stepForgeRelease                      // Pick which forge(s) to create release on
 	stepReleaseNotesMode                  // Choose release notes mode
@@ -56,7 +57,7 @@ type gitInfoMsg struct {
 	repo     RepoInfo
 	tags     []string
 	remotes  []RemoteInfo
-	flutter  FlutterProjectInfo
+	pkgInfo  *pkgmanager.ProjectInfo
 	fetchErr error
 	err      error
 }
@@ -81,7 +82,7 @@ type model struct {
 	// Git repo info
 	repo    RepoInfo
 	remotes []RemoteInfo
-	flutter FlutterProjectInfo
+	pkgInfo *pkgmanager.ProjectInfo
 
 	// Version analysis
 	allTags  []string
@@ -97,7 +98,7 @@ type model struct {
 	newTag          string
 	tagMessage      string
 	releaseNotes    string
-	flutterTarget   string
+	pkgVersionTarget string
 
 	// Remote selections (indices into remotes slice)
 	pushSelected  map[int]bool
@@ -115,8 +116,8 @@ type model struct {
 	pendingBump Version
 
 	// Tracks whether the user explicitly marked this tag as a pre-release.
-	preReleaseExplicit   bool
-	updateFlutterPubspec bool
+	preReleaseExplicit bool
+	updatePkgVersion   bool
 
 	// True when the pending bump is from build-number pattern.
 	preReleaseTargetIsBuild bool
@@ -202,7 +203,7 @@ func gatherGitInfo() tea.Msg {
 	// Detect remotes
 	remotes, _ := detectRemotes()
 
-	flutter, err := detectFlutterProject(repo.RootPath)
+	pkgInfo, err := pkgmanager.DetectAll(repo.RootPath)
 	if err != nil {
 		return gitInfoMsg{repo: repo, tags: tags, remotes: remotes, fetchErr: fetchErr, err: err}
 	}
@@ -211,7 +212,7 @@ func gatherGitInfo() tea.Msg {
 		repo:     repo,
 		tags:     tags,
 		remotes:  remotes,
-		flutter:  flutter,
+		pkgInfo:  pkgInfo,
 		fetchErr: fetchErr,
 	}
 }
@@ -285,7 +286,7 @@ func (m model) handleGitInfo(msg gitInfoMsg) (model, tea.Cmd) {
 	m.repo = msg.repo
 	m.allTags = msg.tags
 	m.remotes = msg.remotes
-	m.flutter = msg.flutter
+	m.pkgInfo = msg.pkgInfo
 
 	// Parse and filter version tags
 	m.versions = filterVersionTags(m.allTags)
@@ -409,27 +410,29 @@ func (m model) enterTagReview() (model, tea.Cmd) {
 	return m, nil
 }
 
-// transitionAfterTagReview optionally prompts to update a Flutter pubspec version
+// transitionAfterTagReview optionally prompts to update a detected package manager version
 // before continuing with the normal release flow.
 func (m model) transitionAfterTagReview() (model, tea.Cmd) {
-	m.flutterTarget = flutterTargetVersionForTag(m.newTag)
-	m.updateFlutterPubspec = false
+	m.updatePkgVersion = false
 
-	if shouldPromptFlutterVersionUpdate(m.flutter, m.flutterTarget) {
-		if needsFlutterVersionUpdate(m.flutter, m.flutterTarget) {
-			m.choices = []Choice{
-				{Label: "No"},
-				{Label: "Yes"},
+	if m.pkgInfo != nil && m.pkgInfo.Manager != nil {
+		m.pkgVersionTarget = m.pkgInfo.Manager.TargetVersionForTag(m.newTag)
+		if m.pkgInfo.Manager.ShouldPromptUpdate(m.pkgInfo, m.pkgVersionTarget) {
+			if m.pkgInfo.Manager.NeedsUpdate(m.pkgInfo, m.pkgVersionTarget) {
+				m.choices = []Choice{
+					{Label: "No"},
+					{Label: "Yes"},
+				}
+				m.cursor = 1
+			} else {
+				m.choices = []Choice{
+					{Label: "Continue"},
+				}
+				m.cursor = 0
 			}
-			m.cursor = 1
-		} else {
-			m.choices = []Choice{
-				{Label: "Continue"},
-			}
-			m.cursor = 0
+			m.step = stepPackageVersionConfirm
+			return m, nil
 		}
-		m.step = stepFlutterPubspecConfirm
-		return m, nil
 	}
 
 	return m.transitionToRemotes()
@@ -527,7 +530,7 @@ func (m model) transitionToSummary() (model, tea.Cmd) {
 		m.tagMessage,
 		m.releaseNotes,
 		m.preReleaseExplicit,
-		m.flutterUpdate(),
+		m.pkgVersionUpdate(),
 		m.repo.Branch,
 		pushRemotes,
 		forgeRemotes,
@@ -675,8 +678,8 @@ func (m model) handleKeyMsg(msg tea.KeyMsg) (model, tea.Cmd) {
 	case stepTagReview:
 		return m.handleTagReview(msg)
 
-	case stepFlutterPubspecConfirm:
-		return m.handleMenuSelect(msg, m.onFlutterPubspecConfirmSelect)
+	case stepPackageVersionConfirm:
+		return m.handleMenuSelect(msg, m.onPackageVersionConfirmSelect)
 
 	case stepRemotes:
 		return m.handleMultiSelect(msg, len(m.remotes), m.pushSelected, m.onRemotesDone)
@@ -803,9 +806,11 @@ func (m model) handleTagReview(msg tea.KeyMsg) (model, tea.Cmd) {
 	return m, nil
 }
 
-// onFlutterPubspecConfirmSelect handles the optional pubspec version update choice.
-func (m model) onFlutterPubspecConfirmSelect(idx int) (model, tea.Cmd) {
-	m.updateFlutterPubspec = needsFlutterVersionUpdate(m.flutter, m.flutterTarget) && idx == 1
+// onPackageVersionConfirmSelect handles the optional package version update choice.
+func (m model) onPackageVersionConfirmSelect(idx int) (model, tea.Cmd) {
+	if m.pkgInfo != nil {
+		m.updatePkgVersion = m.pkgInfo.Manager.NeedsUpdate(m.pkgInfo, m.pkgVersionTarget) && idx == 1
+	}
 	return m.transitionToRemotes()
 }
 
@@ -1121,28 +1126,27 @@ func (m model) onCustomTagDone(value string) (model, tea.Cmd) {
 	return m.transitionToTagReview()
 }
 
-func (m model) flutterUpdate() *FlutterVersionUpdate {
-	if !m.updateFlutterPubspec {
+func (m model) pkgVersionUpdate() *pkgmanager.VersionUpdate {
+	if !m.updatePkgVersion {
 		return nil
 	}
-
-	if !m.flutter.Detected || !m.flutter.HasVersion || m.flutterTarget == "" {
+	if m.pkgInfo == nil || !m.pkgInfo.Detected || !m.pkgInfo.HasVersion || m.pkgVersionTarget == "" {
 		return nil
 	}
-
-	return &FlutterVersionUpdate{
-		Path:           m.flutter.PubspecPath,
-		CurrentVersion: m.flutter.Version,
-		NewVersion:     m.flutterTarget,
-		CommitMessage:  m.buildFlutterVersionCommitMessage(),
+	return &pkgmanager.VersionUpdate{
+		Path:           m.pkgInfo.FilePath,
+		CurrentVersion: m.pkgInfo.Version,
+		NewVersion:     m.pkgVersionTarget,
+		CommitMessage:  m.buildPkgVersionCommitMessage(),
+		Manager:        m.pkgInfo.Manager,
 	}
 }
 
-func (m model) buildFlutterVersionCommitMessage() string {
-	if m.flutterTarget == "" {
+func (m model) buildPkgVersionCommitMessage() string {
+	if m.pkgVersionTarget == "" {
 		return "chore: bump version"
 	}
-	return "chore: bump version to " + m.flutterTarget
+	return "chore: bump version to " + m.pkgVersionTarget
 }
 
 // onRemotesDone handles completion of remote selection.

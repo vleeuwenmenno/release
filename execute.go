@@ -6,14 +6,15 @@ import (
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
+	"release/pkgmanager"
 )
 
 // ExecStepType identifies what kind of execution step this is
 type ExecStepType int
 
 const (
-	ExecUpdateFlutterPubspec ExecStepType = iota
-	ExecCommitFlutterPubspec
+	ExecUpdatePackageVersion ExecStepType = iota
+	ExecCommitPackageVersion
 	ExecPushBranch
 	ExecCreateTag
 	ExecPushTag
@@ -22,10 +23,10 @@ const (
 
 func (e ExecStepType) String() string {
 	switch e {
-	case ExecUpdateFlutterPubspec:
-		return "Update Flutter pubspec"
-	case ExecCommitFlutterPubspec:
-		return "Commit Flutter pubspec"
+	case ExecUpdatePackageVersion:
+		return "Update package version"
+	case ExecCommitPackageVersion:
+		return "Commit package version"
 	case ExecPushBranch:
 		return "Push branch"
 	case ExecCreateTag:
@@ -60,20 +61,13 @@ type ExecStep struct {
 	Duration    time.Duration
 }
 
-type FlutterVersionUpdate struct {
-	Path           string
-	CurrentVersion string
-	NewVersion     string
-	CommitMessage  string
-}
-
 // ReleasePlan holds the complete execution plan built from user choices
 type ReleasePlan struct {
 	Tag                string
 	TagMessage         string
 	ReleaseNotes       string
 	PreReleaseExplicit bool
-	FlutterUpdate      *FlutterVersionUpdate
+	PackageUpdate      *pkgmanager.VersionUpdate
 	Branch             string
 	PushRemotes        []RemoteInfo
 	ForgeRemotes       []RemoteInfo
@@ -82,30 +76,30 @@ type ReleasePlan struct {
 }
 
 // BuildReleasePlan constructs an execution plan from the collected user choices.
-func BuildReleasePlan(tag, tagMessage, releaseNotes string, preReleaseExplicit bool, flutterUpdate *FlutterVersionUpdate, branch string, pushRemotes, forgeRemotes []RemoteInfo, dryRun bool) ReleasePlan {
+func BuildReleasePlan(tag, tagMessage, releaseNotes string, preReleaseExplicit bool, packageUpdate *pkgmanager.VersionUpdate, branch string, pushRemotes, forgeRemotes []RemoteInfo, dryRun bool) ReleasePlan {
 	plan := ReleasePlan{
 		Tag:                tag,
 		TagMessage:         tagMessage,
 		ReleaseNotes:       releaseNotes,
 		PreReleaseExplicit: preReleaseExplicit,
-		FlutterUpdate:      flutterUpdate,
+		PackageUpdate:      packageUpdate,
 		Branch:             branch,
 		PushRemotes:        pushRemotes,
 		ForgeRemotes:       forgeRemotes,
 		DryRun:             dryRun,
 	}
 
-	if flutterUpdate != nil {
+	if packageUpdate != nil {
 		plan.Steps = append(plan.Steps, ExecStep{
-			Type:        ExecUpdateFlutterPubspec,
-			Label:       "Update Flutter pubspec version",
-			Description: fmt.Sprintf("Set %s version from %s to %s", flutterUpdate.Path, flutterUpdate.CurrentVersion, flutterUpdate.NewVersion),
+			Type:        ExecUpdatePackageVersion,
+			Label:       fmt.Sprintf("Update %s version", packageUpdate.Manager.Name()),
+			Description: fmt.Sprintf("Set %s version from %s to %s", packageUpdate.Path, packageUpdate.CurrentVersion, packageUpdate.NewVersion),
 			Status:      ExecPending,
 		})
 		plan.Steps = append(plan.Steps, ExecStep{
-			Type:        ExecCommitFlutterPubspec,
-			Label:       "Commit Flutter pubspec version bump",
-			Description: fmt.Sprintf("git commit --only -m \"%s\" -- %s", escapeSummary(flutterUpdate.CommitMessage), flutterUpdate.Path),
+			Type:        ExecCommitPackageVersion,
+			Label:       fmt.Sprintf("Commit %s version bump", packageUpdate.Manager.Name()),
+			Description: fmt.Sprintf("git commit --only -m \"%s\" -- %s", escapeSummary(packageUpdate.CommitMessage), packageUpdate.Path),
 			Status:      ExecPending,
 		})
 
@@ -174,18 +168,18 @@ func ExecuteStep(plan *ReleasePlan, index int) error {
 	var err error
 
 	switch step.Type {
-	case ExecUpdateFlutterPubspec:
-		if plan.FlutterUpdate == nil {
-			err = fmt.Errorf("no Flutter pubspec update configured")
+	case ExecUpdatePackageVersion:
+		if plan.PackageUpdate == nil {
+			err = fmt.Errorf("no package version update configured")
 		} else {
-			err = updateFlutterPubspecVersion(plan.FlutterUpdate.Path, plan.FlutterUpdate.NewVersion)
+			err = plan.PackageUpdate.Manager.UpdateVersion(plan.PackageUpdate.Path, plan.PackageUpdate.NewVersion)
 		}
 
-	case ExecCommitFlutterPubspec:
-		if plan.FlutterUpdate == nil {
-			err = fmt.Errorf("no Flutter pubspec update configured")
+	case ExecCommitPackageVersion:
+		if plan.PackageUpdate == nil {
+			err = fmt.Errorf("no package version update configured")
 		} else {
-			err = commitTrackedFile(plan.FlutterUpdate.Path, plan.FlutterUpdate.CommitMessage)
+			err = commitTrackedFile(plan.PackageUpdate.Path, plan.PackageUpdate.CommitMessage)
 		}
 
 	case ExecPushBranch:

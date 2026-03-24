@@ -49,10 +49,3 @@ func TestBumpSemverRefreshesDateBuildMetadata(t *testing.T) {
 		t.Fatalf("expected bumped version v1.10.12+24032026, got %q", bumped.Raw)
 	}
 }
-
-func TestFlutterTargetVersionKeepsBuildMetadata(t *testing.T) {
-	got := flutterTargetVersionForTag("v1.10.12+24032026")
-	if got != "1.10.12+24032026" {
-		t.Fatalf("expected flutter target to preserve build metadata, got %q", got)
-	}
-}
