@@ -4,12 +4,13 @@ import (
 	"fmt"
 	"strings"
 
+	"release/pkgmanager"
+
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"release/pkgmanager"
 )
 
 // step represents the current screen in the TUI flow
@@ -91,13 +92,13 @@ type model struct {
 	lines    []VersionLine
 
 	// User selections
-	selectedLineIdx int
-	selectedBump    BumpType
-	latestVersion   Version
-	hasLatest       bool
-	newTag          string
-	tagMessage      string
-	releaseNotes    string
+	selectedLineIdx  int
+	selectedBump     BumpType
+	latestVersion    Version
+	hasLatest        bool
+	newTag           string
+	tagMessage       string
+	releaseNotes     string
 	pkgVersionTarget string
 
 	// Remote selections (indices into remotes slice)

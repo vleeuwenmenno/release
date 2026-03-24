@@ -5,8 +5,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/lipgloss"
 	"release/pkgmanager"
+
+	"github.com/charmbracelet/lipgloss"
 )
 
 // ExecStepType identifies what kind of execution step this is
