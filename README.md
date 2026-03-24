@@ -57,6 +57,16 @@ release -dry-run               # Preview without executing
 release -force                 # Proceed despite dirty working tree
 ```
 
+#### Overview of finished release process
+<img width="799" height="450" alt="image" src="https://github.com/user-attachments/assets/cd4cc741-bb1c-4cc6-8950-5c3a9bf3406f" />
+
+#### Inteligently suggest versioning
+<img width="871" height="349" alt="image" src="https://github.com/user-attachments/assets/0d989acf-49e3-43a0-90a6-1c60bd47c79b" />
+
+#### Review before doing
+<img width="861" height="493" alt="image" src="https://github.com/user-attachments/assets/64cd7f46-bdf4-4cc6-a798-11cd3b2d00e3" />
+
+
 ## Requirements
 
 - Git
