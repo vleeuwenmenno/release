@@ -1,8 +1,9 @@
 package main
 
 import (
-	"github.com/vleeuwenmenno/release/pkgmanager"
 	"testing"
+
+	"github.com/vleeuwenmenno/release/pkgmanager"
 )
 
 func TestBuildReleasePlanAddsPackageCommitStepBeforeTag(t *testing.T) {
@@ -48,12 +49,11 @@ func TestBuildReleasePlanAddsPackageCommitStepBeforeTag(t *testing.T) {
 // stubManager is a minimal pkgmanager.Manager implementation for testing.
 type stubManager struct{}
 
-func (s *stubManager) Name() string                                                { return "Stub" }
-func (s *stubManager) Detect(rootPath string) (*pkgmanager.ProjectInfo, error)    { return nil, nil }
-func (s *stubManager) TargetVersionForTag(tag string) string                      { return tag }
+func (s *stubManager) Name() string                                            { return "Stub" }
+func (s *stubManager) Detect(rootPath string) (*pkgmanager.ProjectInfo, error) { return nil, nil }
+func (s *stubManager) TargetVersionForTag(tag string) string                   { return tag }
 func (s *stubManager) ShouldPromptUpdate(info *pkgmanager.ProjectInfo, target string) bool {
 	return false
 }
 func (s *stubManager) NeedsUpdate(info *pkgmanager.ProjectInfo, target string) bool { return false }
 func (s *stubManager) UpdateVersion(filePath, newVersion string) error              { return nil }
-
