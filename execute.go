@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"release/pkgmanager"
+	"github.com/vleeuwenmenno/release/pkgmanager"
 
 	"github.com/charmbracelet/lipgloss"
 )

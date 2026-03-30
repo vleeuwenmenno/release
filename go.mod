@@ -1,4 +1,4 @@
-module release
+module github.com/vleeuwenmenno/release
 
 go 1.23.0
 

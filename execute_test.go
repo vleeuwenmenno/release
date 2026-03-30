@@ -1,7 +1,7 @@
 package main
 
 import (
-	"release/pkgmanager"
+	"github.com/vleeuwenmenno/release/pkgmanager"
 	"testing"
 )
 

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"release/pkgmanager"
+	"github.com/vleeuwenmenno/release/pkgmanager"
 
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textarea"
