@@ -8,9 +8,12 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
+var version = "dev"
+
 func main() {
 	flags := Flags{}
 
+	showVersion := flag.Bool("version", false, "Print version and exit")
 	flag.StringVar(&flags.Tag, "tag", "", "Manual tag to create (skips version detection and bump menu)")
 	flag.StringVar(&flags.Message, "message", "", "Tag/release message (default: \"Release <tag>\")")
 	flag.BoolVar(&flags.Push, "push", false, "Automatically push tag to all remotes")
@@ -32,6 +35,11 @@ func main() {
 	}
 
 	flag.Parse()
+
+	if *showVersion {
+		fmt.Println("release " + version)
+		os.Exit(0)
+	}
 
 	m := initialModel(flags)
 	p := tea.NewProgram(m, tea.WithAltScreen())
